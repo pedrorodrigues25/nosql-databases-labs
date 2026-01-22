@@ -1,19 +1,22 @@
-// Query 20: Price vs Rating Correlation Analysis
-// Analyzes relationship between price ranges and guest ratings
-// Usage: mongosh queries/20_price_rating_analysis.mongosh.js
+// Query 20: Price vs Rating Correlation Analysis // Título da consulta
+// Analyzes relationship between price ranges and guest ratings // Descrição em inglês
+// Usage: mongosh queries/20_price_rating_analysis.mongosh.js // Como executar
 
-db = db.getSiblingDB("group_04_airbnb");
+// Seleciona o banco de dados correto
+db = db.getSiblingDB("group_04_airbnb"); // Troca para o DB do grupo
 
+// Imprime o título da consulta no terminal
 print("\n=== Price vs Rating Correlation Analysis ===\n");
 
+// Inicia a agregação na coleção "listings"
 db.listings
   .aggregate([
-    // Filter only listings with reviews
+    // Filtra apenas alojamentos com avaliações
     { $match: { "reviews.number_of_reviews": { $gt: 0 } } },
-    // Bucket by price ranges
+    // Agrupa por faixas de preço
     {
       $bucket: {
-        groupBy: "$price",
+        groupBy: "$price", // Campo de agrupamento
         boundaries: [
           NumberDecimal("0"),
           NumberDecimal("50"),
@@ -23,90 +26,37 @@ db.listings
           NumberDecimal("150"),
           NumberDecimal("200"),
           NumberDecimal("500"),
-        ],
-        default: "500+",
+        ], // Limites das faixas
+        default: "500+", // Faixa padrão para valores acima de 500
         output: {
-          count: { $sum: 1 },
-          avg_rating: { $avg: "$reviews.review_scores_rating" },
-          min_rating: { $min: "$reviews.review_scores_rating" },
-          max_rating: { $max: "$reviews.review_scores_rating" },
-          total_reviews: { $sum: "$reviews.number_of_reviews" },
-          avg_reviews_per_listing: { $avg: "$reviews.number_of_reviews" },
+          count: { $sum: 1 }, // Quantidade de alojamentos
+          avg_rating: { $avg: "$reviews.review_scores_rating" }, // Nota média
+          min_rating: { $min: "$reviews.review_scores_rating" }, // Nota mínima
+          max_rating: { $max: "$reviews.review_scores_rating" }, // Nota máxima
+          total_reviews: { $sum: "$reviews.number_of_reviews" }, // Total de avaliações
+          avg_reviews_per_listing: { $avg: "$reviews.number_of_reviews" }, // Média de avaliações por alojamento
           sample_listings: {
-            $push: { name: "$name", price: "$price", rating: "$reviews.review_scores_rating" },
+            $push: { name: "$name", price: "$price", rating: "$reviews.review_scores_rating" }, // Exemplos
           },
         },
       },
     },
-    // Format output
+    // Formata o resultado final
     {
       $project: {
-        price_range: "$_id",
-        count: 1,
-        avg_rating: { $round: ["$avg_rating", 2] },
-        min_rating: 1,
-        max_rating: 1,
-        total_reviews: 1,
-        avg_reviews_per_listing: { $round: ["$avg_reviews_per_listing", 1] },
-        sample_listings: { $slice: ["$sample_listings", 3] },
-      },
-    },
-    { $sort: { _id: 1 } },
+        price_range: "$_id", // Faixa de preço
+        count: 1, // Quantidade
+        avg_rating: { $round: ["$avg_rating", 2] }, // Nota média arredondada
+        min_rating: 1, // Nota mínima
+        max_rating: 1, // Nota máxima
+        total_reviews: 1, // Total de avaliações
+        avg_reviews_per_listing: { $round: ["$avg_reviews_per_listing", 1] }, // Média arredondada
+        sample_listings: 1 // Exemplos de alojamentos
+      }
+    }
   ])
+  // Para cada documento do resultado, imprime em formato JSON
   .forEach((doc) => printjson(doc));
 
-print("\n--- Summary Statistics ---\n");
-
-// Calculate overall correlation summary
-const summary = db.listings
-  .aggregate([
-    { $match: { "reviews.number_of_reviews": { $gt: 0 } } },
-    {
-      $group: {
-        _id: null,
-        total_listings_with_reviews: { $sum: 1 },
-        overall_avg_rating: { $avg: "$reviews.review_scores_rating" },
-        overall_avg_price: { $avg: "$price" },
-        high_rated_count: {
-          $sum: { $cond: [{ $gte: ["$reviews.review_scores_rating", 4.5] }, 1, 0] },
-        },
-        budget_high_rated: {
-          $sum: {
-            $cond: [
-              {
-                $and: [
-                  { $lte: ["$price", NumberDecimal("75")] },
-                  { $gte: ["$reviews.review_scores_rating", 4.5] },
-                ],
-              },
-              1,
-              0,
-            ],
-          },
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        total_listings_with_reviews: 1,
-        overall_avg_rating: { $round: ["$overall_avg_rating", 2] },
-        overall_avg_price: { $round: ["$overall_avg_price", 2] },
-        high_rated_count: 1,
-        budget_high_rated: 1,
-        high_rated_percentage: {
-          $round: [
-            {
-              $multiply: [{ $divide: ["$high_rated_count", "$total_listings_with_reviews"] }, 100],
-            },
-            1,
-          ],
-        },
-      },
-    },
-  ])
-  .toArray()[0];
-
-printjson(summary);
-
+// Imprime mensagem de sucesso no terminal
 print("\n✓ Query executed successfully\n");
